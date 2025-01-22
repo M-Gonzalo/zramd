@@ -161,8 +161,8 @@ func run() int {
 		if args.Start.Algorithm == "zstd" && !kernelversion.SupportsZstd() {
 			parser.Fail("the zstd algorithm is not supported on kernels < 4.19")
 		}
-		if args.Start.Fraction < 0.05 || args.Start.Fraction > 2 {
-			parser.Fail("--fraction must have a value between 0.05 and 1")
+		if args.Start.Fraction < 0.05 || args.Start.Fraction > 3 {
+			parser.Fail("--fraction must have a value between 0.05 and 3")
 		}
 		if args.Start.NumDevices < 1 {
 			parser.Fail("--num-devices must have a value greater or equal than 1")
