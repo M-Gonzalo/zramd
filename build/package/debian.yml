@@ -16,15 +16,20 @@ scripts:
     #!/bin/sh
     if [ -d /run/systemd/system ]; then
       deb-systemd-invoke enable --now zramd.service >/dev/null || true
+      # Don't auto-start metrics service, let user decide when to enable it
+      systemctl daemon-reload >/dev/null || true
     fi
   prerm: |-
     #!/bin/sh
     if [ -d /run/systemd/system ] && [ "$1" = remove ]; then
+      deb-systemd-invoke disable --now zramd-metrics.service >/dev/null || true
       deb-systemd-invoke disable --now zramd.service >/dev/null || true
     fi
   postrm: |-
     if [ -d /run/systemd/system ] && [ "$1" = remove ]; then
       systemctl --system daemon-reload >/dev/null || true
+      # Clean up metrics directory on full removal
+      rm -rf /var/log/zramd/metrics
     fi
 
 build:
@@ -33,6 +38,7 @@ build:
     env:
       PREFIX: ${PREFIX}
       output: ${BIN_FILE}
+      METRICS_OUT_FILE: ${METRICS_BIN_FILE}
   # Additional arguments passed to dpkg-deb, see also
   # https://manpages.debian.org/jessie/dpkg/dpkg-deb.1.en.html
   args: [-Zgzip, -z9]

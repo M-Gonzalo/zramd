@@ -57,24 +57,24 @@ See also https://fedoraproject.org/wiki/Changes/SwapOnZRAM#Benefit_to_Fedora
 
   Options:
     --algorithm ALGORITHM, -a ALGORITHM
-                           zram compression algorithm
-                           [default: zstd, env: ALGORITHM]
+                          zram compression algorithm
+                          [default: zstd, env: ALGORITHM]
     --fraction FRACTION, -f FRACTION
-                           maximum percentage of RAM allowed to use
-                           [default: 1.0, env: FRACTION]
+                          maximum percentage of RAM allowed to use
+                          [default: 1.0, env: FRACTION]
     --max-size MAX_SIZE, -m MAX_SIZE
-                           maximum total MB of swap to allocate
-                           [default: 8192, env: MAX_SIZE]
+                          maximum total MB of swap to allocate
+                          [default: 8192, env: MAX_SIZE]
     --num-devices NUM_DEVICES, -n NUM_DEVICES
-                           maximum number of zram devices to create
-                           [default: 1, env: NUM_DEVICES]
+                          maximum number of zram devices to create
+                          [default: 1, env: NUM_DEVICES]
     --priority PRIORITY, -p PRIORITY
-                           swap priority
-                           [default: 100, env: PRIORITY]
-    --skip-vm, -s          skip initialization if running on a VM
-                           [default: false, env: SKIP_VM]
-    --help, -h             display this help and exit
-    --version              display version and exit
+                          swap priority
+                          [default: 100, env: PRIORITY]
+    --skip-vm, -s         skip initialization if running on a VM
+                          [default: false, env: SKIP_VM]
+    --help, -h            display this help and exit
+    --version             display version and exit
   ```
 
 ## Compilation
@@ -123,6 +123,50 @@ See also https://fedoraproject.org/wiki/Changes/SwapOnZRAM#Benefit_to_Fedora
 
 * Just change the arguments as you like, e.g. `zramd start --max-size 1024` or `zramd start --fraction 0.5 --priority 0`
 
+## Metrics Collection
+
+The package includes an optional metrics collection service that tracks compression ratios and memory usage patterns:
+
+### Enable Collection
+```bash
+sudo systemctl enable --now zramd-metrics.service
+```
+
+### Statistics Collected
+The metrics collector runs every minute and maintains aggregated statistics in `/var/log/zramd/metrics/zram_stats.json`:
+
+1. Compression Ratios:
+   - Best ratio achieved
+   - Worst ratio seen
+   - Running average ratio
+   - Distribution (minutes spent in each category):
+     * Excellent (≤0.2)
+     * Good (0.2-0.3)
+     * Fair (0.3-0.4)
+     * Poor (>0.4)
+
+2. Memory Usage:
+   - Peak usage
+   - Minimum usage
+   - Average usage
+   - Distribution (minutes spent at each level):
+     * Low (0-25%)
+     * Medium (25-50%)
+     * High (50-75%)
+     * Critical (>75%)
+
+3. Time Analysis:
+   - Usage patterns by hour
+   - Peak usage times
+   - Usage stability metrics
+
+4. System Impact:
+   - Out of memory events
+   - Maximum swap usage
+   - Time under swap pressure
+
+These statistics help determine the optimal zram configuration for your system's workload.
+
 ## Troubleshooting
 
 * **modprobe: FATAL: Module zram not found in directory /lib/modules/...**  
@@ -138,7 +182,9 @@ See also https://fedoraproject.org/wiki/Changes/SwapOnZRAM#Benefit_to_Fedora
   * If you boot the same system on a real computer as well as on a virtual machine, you can use the `--skip-vm` parameter to avoid initialization when running inside a virtual machine.
 * For best results install `systemd-oomd` or `earlyoom` (they may not be available on all distributions).
 * You can use `swapon -show` or `zramctl` to see all swap devices currently in use, this is useful if you want to confirm that all of the zram devices were setup correctly.
-* To quickly fill the memory, you can use `tail /dev/zero` but keep in mind that your system may become unresponsive if you do not have an application like `earlyoom` to kill `tail` just before it reaches the memory limit.
+* You can use `tail /dev/zero` to quickly fill the memory, but keep in mind that your system may become unresponsive if you do not have an application like `earlyoom` to kill `tail` just before it reaches the memory limit.
+
+## Testing
 * To test some zramd commands under the same conditions as the systemd unit you can use `systemd-run` e.g.
   ```bash
   sudo systemd-run -t \

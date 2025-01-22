@@ -1,0 +1,38 @@
+[Unit]
+Description=ZRAM Metrics Collector
+After=zramd.service
+BindsTo=zramd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/zramd-metrics
+Restart=always
+RestartSec=60
+
+# Security settings
+ProtectHostname=yes         
+PrivateNetwork=yes
+IPAddressDeny=any
+NoNewPrivileges=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_SYS_MODULE
+SystemCallFilter=@module @swap @system-service
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+DeviceAllow=block-* rw
+DevicePolicy=closed
+RestrictAddressFamilies=AF_UNIX
+RestrictAddressFamilies=~AF_UNIX
+
+# Device and mount access
+PrivateDevices=no
+MountFlags=shared
+
+# Allow writing to metrics directory
+ReadWritePaths=/var/log/zramd/metrics
+
+[Install]
+WantedBy=multi-user.target

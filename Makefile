@@ -7,6 +7,8 @@ else
 OUT_FILE := $(output)
 endif
 
+METRICS_OUT_FILE := dist/$(MODULE)-metrics.bin
+
 default:
 	@{\
 		set -e ;\
@@ -24,13 +26,19 @@ start:
 clean:
 	go clean 2>/dev/null || true
 	rm -rf dist/*
-	rm -f "$(OUT_FILE)"
+	rm -f "$(OUT_FILE)" "$(METRICS_OUT_FILE)"
 
 # Build development binary
 .PHONY: build
-build:
+build: build-main build-metrics
+
+build-main:
 	go build -v -o $(OUT_FILE) $(GO_FILE)
 	@ls -lh "$(OUT_FILE)"
+
+build-metrics:
+	go build -v -o $(METRICS_OUT_FILE) ./cmd/zramd-metrics
+	@ls -lh "$(METRICS_OUT_FILE)"
 
 release:
 	@{\
@@ -39,7 +47,7 @@ release:
 			echo "The type parameter must be \"static\" or \"dynamic\"" ;\
 			exit 1 ;\
 		fi ;\
-		echo "Building $(type) binary (GOARCH: $(GOARCH) GOARM: $(GOARM))..." ;\
+		echo "Building $(type) binaries (GOARCH: $(GOARCH) GOARM: $(GOARM))..." ;\
 		if [ -z "$${skip_clean}" ]; then make --no-print-directory clean; fi ;\
 		export VERSION_FLAGS="-X main.Version=$$(make --no-print-directory version) -X main.CommitDate=$$(make --no-print-directory commit-date)" ;\
 		case "$(type)" in \
@@ -62,6 +70,7 @@ release-static:
 			args+=("-buildmode=pie") ;\
 		fi ;\
 		CGO_ENABLED=0 go build "$${args[@]}" -o "$(OUT_FILE)" $(GO_FILE) ;\
+		CGO_ENABLED=0 go build "$${args[@]}" -o "$(METRICS_OUT_FILE)" ./cmd/zramd-metrics ;\
 	}
 
 # Build dynamically linked production binary
@@ -77,6 +86,7 @@ release-dynamic:
 			args+=("-buildmode=pie") ;\
 		fi ;\
 		go build "$${args[@]}" -o "$(OUT_FILE)" $(GO_FILE) ;\
+		go build "$${args[@]}" -o "$(METRICS_OUT_FILE)" ./cmd/zramd-metrics ;\
 	}
 
 postbuild:
@@ -87,7 +97,7 @@ postbuild:
 			echo "Creating \"$${tgz_file}\"..." ;\
 			tar -C "$$(dirname "$(OUT_FILE)")" \
 				-cz -f "$$tgz_file" \
-				"$$(basename "$(OUT_FILE)")" ;\
+				"$$(basename "$(OUT_FILE)")" "$$(basename "$(METRICS_OUT_FILE)")" ;\
 		fi ;\
 		if [ ! -z "$${make_deb}" ]; then \
 			echo "Creating deb ($${DEB_ARCH}) file..." ;\
@@ -95,13 +105,14 @@ postbuild:
 				ARCH=$${DEB_ARCH} \
 				PREFIX="$${PREFIX}" \
 				BIN_FILE="$(OUT_FILE)" \
+				METRICS_BIN_FILE="$(METRICS_OUT_FILE)" \
 				VERSION=$${VERSION} \
 				RELEASE=$${RELEASE} \
 				./scripts/mkdeb.py ;\
 				rm -rf "$${PREFIX}" ;\
 		fi ;\
 	}
-	@ls -lh "$(OUT_FILE)"*
+	@ls -lh "$(OUT_FILE)"* "$(METRICS_OUT_FILE)"*
 
 docker:
 	@{\
@@ -157,17 +168,24 @@ update:
 
 install:
 	install -Dm755 "$(OUT_FILE)" "$(PREFIX)/usr/bin/$(MODULE)"
+	install -Dm755 "$(METRICS_OUT_FILE)" "$(PREFIX)/usr/bin/$(MODULE)-metrics"
 	install -Dm644 LICENSE -t "$(PREFIX)/usr/share/licenses/$(MODULE)/"
 	install -Dm644 build/package/$(MODULE).default "$(PREFIX)/etc/default/$(MODULE)"
 	install -Dm644 build/package/$(MODULE).service -t "$(PREFIX)/usr/lib/systemd/system/"
+	install -Dm644 build/package/$(MODULE)-metrics.service -t "$(PREFIX)/usr/lib/systemd/system/"
 
 uninstall:
 	@{\
 		if [ -f "$(PREFIX)/usr/lib/systemd/system/$(MODULE).service" ]; then \
 			systemctl disable --now $(MODULE).service ;\
 		fi ;\
+		if [ -f "$(PREFIX)/usr/lib/systemd/system/$(MODULE)-metrics.service" ]; then \
+			systemctl disable --now $(MODULE)-metrics.service ;\
+		fi ;\
 	}
 	rm -f "$(PREFIX)/usr/lib/systemd/system/$(MODULE).service"
+	rm -f "$(PREFIX)/usr/lib/systemd/system/$(MODULE)-metrics.service"
 	rm -f "$(PREFIX)/etc/default/$(MODULE)"
 	rm -rf "$(PREFIX)/usr/share/licenses/$(MODULE)/"
 	rm -f "$(PREFIX)/usr/bin/$(MODULE)"
+	rm -f "$(PREFIX)/usr/bin/$(MODULE)-metrics"
